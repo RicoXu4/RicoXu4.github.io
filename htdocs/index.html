@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WebView Navigation Diagnostics</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; padding: 16px; }
+    input, button { font-size: 16px; padding: 10px; width: 100%; margin: 8px 0; }
+    .row { display: grid; gap: 10px; grid-template-columns: 1fr; max-width: 720px; }
+    pre { background: #f6f6f6; padding: 12px; white-space: pre-wrap; word-break: break-word; }
+    small { color: #555; }
+  </style>
+</head>
+<body>
+  <h2>WebView Navigation Diagnostics</h2>
+  <p><small>
+    This page helps you test which URL schemes and navigation methods your embedded WebView allows.
+    It does not include any pre-made privileged intents. You can paste your own test URL(s).
+  </small></p>
+
+  <div class="row">
+    <label>Test URL (paste your own):</label>
+    <input id="u" placeholder="e.g. https://example.com or (your custom scheme)" />
+
+    <button onclick="goAssign()">Navigate via location.assign()</button>
+    <button onclick="goHref()">Navigate via location.href</button>
+    <button onclick="goOpen()">Try window.open()</button>
+    <button onclick="goMeta()">Meta refresh in 1s</button>
+
+    <label>Optional: chained redirect URL (HTTP->your target)</label>
+    <input id="r" placeholder="e.g. https://your-redirector.example/?to=..." />
+    <button onclick="goRedirector()">Go to redirector URL</button>
+
+    <h3>Environment</h3>
+    <pre id="env"></pre>
+
+    <h3>Event Log</h3>
+    <pre id="log"></pre>
+  </div>
+
+  <script>
+    const logEl = document.getElementById('log');
+    const envEl = document.getElementById('env');
+    const uEl = document.getElementById('u');
+    const rEl = document.getElementById('r');
+
+    function log(msg) {
+      const t = new Date().toISOString();
+      logEl.textContent = `[${t}] ${msg}\n` + logEl.textContent;
+    }
+
+    function env() {
+      const info = {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        language: navigator.language,
+        cookiesEnabled: navigator.cookieEnabled,
+        javaEnabled: (navigator.javaEnabled ? navigator.javaEnabled() : null),
+        location: location.href,
+        referrer: document.referrer
+      };
+      envEl.textContent = JSON.stringify(info, null, 2);
+    }
+    env();
+
+    window.addEventListener('error', (e) => log(`JS error: ${e.message}`));
+    window.addEventListener('unhandledrejection', (e) => log(`Promise rejection: ${String(e.reason)}`));
+
+    function getURL() {
+      const u = uEl.value.trim();
+      if (!u) { alert("Paste a URL to test."); throw new Error("No URL"); }
+      return u;
+    }
+
+    function goAssign() {
+      const u = getURL();
+      log(`location.assign -> ${u}`);
+      try { location.assign(u); } catch (e) { log(`assign threw: ${e}`); }
+    }
+
+    function goHref() {
+      const u = getURL();
+      log(`location.href -> ${u}`);
+      try { location.href = u; } catch (e) { log(`href threw: ${e}`); }
+    }
+
+    function goOpen() {
+      const u = getURL();
+      log(`window.open -> ${u}`);
+      try {
+        const w = window.open(u, '_blank');
+        log(`window.open result: ${w ? 'opened' : 'blocked/null'}`);
+      } catch (e) { log(`open threw: ${e}`); }
+    }
+
+    function goMeta() {
+      const u = getURL();
+      log(`meta refresh scheduled -> ${u}`);
+      const m = document.createElement('meta');
+      m.httpEquiv = "refresh";
+      m.content = "1;url=" + u;
+      document.head.appendChild(m);
+      log(`meta tag injected`);
+    }
+
+    function goRedirector() {
+      const r = rEl.value.trim();
+      if (!r) { alert("Paste a redirector URL."); throw new Error("No redirector"); }
+      log(`navigating to redirector -> ${r}`);
+      try { location.href = r; } catch (e) { log(`redirector nav threw: ${e}`); }
+    }
+  </script>
+</body>
+</html>
